@@ -65,33 +65,21 @@
 
         <main class="player-container">
             <div class="video-wrapper" id="video-container">
-                <!-- Native controls removed for custom UI -->
-                <video id="video" autoplay playsinline muted></video>
+                <!-- Native HTML5 Video Player with Default Controls -->
+                <video id="video" controls autoplay playsinline muted preload="metadata"></video>
 
-                <!-- Custom Controls -->
-                <div class="custom-controls-bar" id="custom-controls">
-                    <button class="ctrl-btn" onclick="video.paused ? video.play() : video.pause()" title="Play/Pause">
-                        <span id="play-icon">▶</span>
-                    </button>
+                <!-- Connection Quality Indicator -->
+                <div class="connection-indicator" id="connection-indicator">
+                    <span id="connection-status">●</span>
+                    <span id="connection-text">Checking...</span>
+                </div>
 
-                    <button class="ctrl-btn" onclick="video.currentTime -= 5" title="Rewind 5s">↺ 5s</button>
-                    <button class="ctrl-btn" onclick="video.currentTime += 5" title="Forward 5s">↻ 5s</button>
-
-                    <button class="ctrl-btn" id="mute-btn" onclick="toggleMute()" title="Mute/Unmute">🔊</button>
-                    <input type="range" class="volume-slider" min="0" max="1" step="0.1" value="1" id="volume-range"
-                        oninput="video.volume=this.value; video.muted=false; updateMuteIcon();">
-
-                    <div class="spacer"></div>
-
-                    <div class="quality-control"
-                        style="position: relative; top: auto; right: auto; background: none; border: none; padding: 0;">
-                        <select id="quality-select"
-                            style="background: rgba(0,0,0,0.5); padding: 5px; border-radius: 5px;">
-                            <option value="-1">Auto</option>
-                        </select>
-                    </div>
-
-                    <button class="ctrl-btn" onclick="toggleFullScreen()" title="Fullscreen">⛶</button>
+                <!-- Quality Selector Overlay -->
+                <div class="quality-control">
+                    <label>Quality:</label>
+                    <select id="quality-select">
+                        <option value="-1">Auto</option>
+                    </select>
                 </div>
             </div>
 
@@ -149,7 +137,9 @@
         var debugLog = document.getElementById('debug-log');
         var proxyToggle = document.getElementById('proxy-toggle');
         var urlInput = document.getElementById('stream-url');
-        var playIcon = document.getElementById('play-icon');
+        var connectionIndicator = document.getElementById('connection-indicator');
+        var connectionStatus = document.getElementById('connection-status');
+        var connectionText = document.getElementById('connection-text');
 
         // Default Link
         var defaultUrl = 'https://mut001.myluck1.top:8088/live/webcricn04/playlist.m3u8?vidictid=204966096525&id=114607&pk=3ef738dd90c7c0b44c4ca785f01c42dd3e4ea28aabe1fd655dcc0306b3bd32f87d2052fbb9f7afe9054dcc7a5485c9edb693e01479cd2799bc0f6cfa25f063bd';
@@ -161,43 +151,83 @@
         proxyToggle.checked = useProxy;
 
         var hls;
+        var connectionQuality = 'good'; // good, medium, poor
+        var bufferingCount = 0;
+        var lastBufferTime = 0;
 
         function logError(msg) {
             debugLog.style.display = 'block';
             debugLog.innerText += "\n> " + msg;
         }
 
-        // Fullscreen Logic
-        function toggleFullScreen() {
-            var container = document.getElementById('video-container');
-            if (!document.fullscreenElement) {
-                if (container.requestFullscreen) container.requestFullscreen();
-                else if (video.webkitEnterFullscreen) video.webkitEnterFullscreen(); // iOS Safari fallback
+        // Connection Quality Monitor
+        function updateConnectionQuality(quality) {
+            connectionQuality = quality;
+
+            if (quality === 'good') {
+                connectionStatus.style.color = '#4ade80';
+                connectionText.innerText = 'Good Connection';
+            } else if (quality === 'medium') {
+                connectionStatus.style.color = '#fbbf24';
+                connectionText.innerText = 'Medium Connection';
             } else {
-                if (document.exitFullscreen) document.exitFullscreen();
+                connectionStatus.style.color = '#f87171';
+                connectionText.innerText = 'Poor Connection';
             }
         }
 
-        // Update Play Icon
-        video.onplay = function () { playIcon.innerText = "⏸"; };
-        video.onpause = function () { playIcon.innerText = "▶"; };
+        // Monitor buffering and adjust quality
+        video.addEventListener('waiting', function () {
+            bufferingCount++;
+            var currentTime = Date.now();
 
-        function updateMuteIcon() {
-            var muteBtn = document.getElementById('mute-btn');
-            if (video.muted || video.volume === 0) {
-                muteBtn.innerText = "🔇";
-            } else {
-                muteBtn.innerText = "🔊";
+            if (currentTime - lastBufferTime < 5000) {
+                // Buffering too frequently
+                if (hls && hls.currentLevel > 0) {
+                    // Lower quality
+                    hls.currentLevel = Math.max(0, hls.currentLevel - 1);
+                    updateConnectionQuality('poor');
+                    logError('Lowering quality due to buffering');
+                }
             }
-        }
 
-        function toggleMute() {
-            video.muted = !video.muted;
-            if (!video.muted && video.volume === 0) video.volume = 1;
-            updateMuteIcon();
-        }
+            lastBufferTime = currentTime;
+            statusText.innerText = 'Buffering...';
+        });
 
-        video.onvolumechange = updateMuteIcon;
+        video.addEventListener('playing', function () {
+            statusText.innerText = proxyToggle.checked ? "LIVE (Unblocked)" : "LIVE (Direct)";
+
+            // Reset buffering count after successful playback
+            setTimeout(function () {
+                if (bufferingCount < 3) {
+                    updateConnectionQuality('good');
+                } else if (bufferingCount < 6) {
+                    updateConnectionQuality('medium');
+                }
+                bufferingCount = 0;
+            }, 10000);
+        });
+
+        // Error handling with retry
+        var retryCount = 0;
+        var maxRetries = 3;
+
+        video.addEventListener('error', function (e) {
+            logError('Video error: ' + (e.message || 'Unknown error'));
+
+            if (retryCount < maxRetries) {
+                retryCount++;
+                statusText.innerText = 'Connection issue. Retrying... (' + retryCount + '/' + maxRetries + ')';
+
+                setTimeout(function () {
+                    loadStream(videoSrc);
+                }, 2000 * retryCount); // Exponential backoff
+            } else {
+                statusText.innerText = 'Failed to load stream. Try enabling Unblocker.';
+                updateConnectionQuality('poor');
+            }
+        });
 
         function loadStream(url) {
             if (hls) {
@@ -213,14 +243,23 @@
             }
 
             logError("Loading...");
+            updateConnectionQuality('medium');
 
             if (Hls.isSupported()) {
                 var config = {
                     startLevel: -1,             // AUTO Quality (Starts low, upgrades if good)
                     autoLevelEnabled: true,     // Enable Auto-Switching
-                    maxBufferLength: 30,
-                    maxMaxBufferLength: 60,
+                    maxBufferLength: 20,        // Reduced for mobile
+                    maxMaxBufferLength: 40,     // Reduced for mobile
                     liveSyncDurationCount: 3,
+                    enableWorker: true,         // Use web worker for better performance
+                    lowLatencyMode: false,      // Disable for better stability
+                    backBufferLength: 10,       // Keep some back buffer
+
+                    // Mobile-specific optimizations
+                    abrEwmaDefaultEstimate: 500000, // Start with lower estimate
+                    abrBandWidthFactor: 0.95,       // More conservative bandwidth usage
+                    abrBandWidthUpFactor: 0.7,      // Slower quality upgrades
                 };
 
                 hls = new Hls(config);
@@ -228,49 +267,89 @@
                 hls.attachMedia(video);
 
                 hls.on(Hls.Events.MANIFEST_PARSED, function () {
-                    video.play().catch(e => logError("Tap Play"));
+                    video.play().catch(e => {
+                        logError("Tap Play button to start");
+                        statusText.innerText = "Ready - Tap Play";
+                    });
                     statusText.innerText = proxyToggle.checked ? "LIVE (Unblocked)" : "LIVE (Direct)";
                     logError("Connected!");
+                    updateConnectionQuality('good');
+                    retryCount = 0; // Reset retry count on success
 
                     // Populate Quality
                     qualitySelect.innerHTML = '';
+
+                    // Add Auto option first
+                    var autoOpt = document.createElement('option');
+                    autoOpt.value = -1;
+                    autoOpt.text = "Auto (Recommended)";
+                    autoOpt.selected = true;
+                    qualitySelect.appendChild(autoOpt);
+
+                    // Add quality levels
                     hls.levels.forEach(function (level, index) {
                         var option = document.createElement('option');
                         option.value = index;
-                        option.text = (level.height || "Auto") + (index === hls.levels.length - 1 ? " (HD)" : "");
+                        var height = level.height || '?';
+                        var label = height + 'p';
+                        if (height >= 720) label += ' (HD)';
+                        if (height >= 1080) label += ' ⭐';
+                        option.text = label;
                         qualitySelect.appendChild(option);
                     });
-                    // Add Auto option
-                    var autoOpt = document.createElement('option');
-                    autoOpt.value = -1;
-                    autoOpt.text = "Auto (Best)";
-                    autoOpt.selected = true;
-                    qualitySelect.insertBefore(autoOpt, qualitySelect.firstChild);
                 });
 
                 hls.on(Hls.Events.ERROR, function (event, data) {
                     if (data.fatal) {
-                        logError("Error: " + data.type);
+                        logError("Error: " + data.type + " - " + (data.details || ''));
+
                         switch (data.type) {
                             case Hls.ErrorTypes.NETWORK_ERROR:
+                                logError("Network error - attempting recovery...");
+                                updateConnectionQuality('poor');
                                 hls.startLoad();
                                 break;
                             case Hls.ErrorTypes.MEDIA_ERROR:
+                                logError("Media error - attempting recovery...");
                                 hls.recoverMediaError();
                                 break;
                             default:
+                                logError("Fatal error - destroying player");
                                 hls.destroy();
+
+                                // Try to reload after a delay
+                                setTimeout(function () {
+                                    if (retryCount < maxRetries) {
+                                        retryCount++;
+                                        loadStream(videoSrc);
+                                    }
+                                }, 3000);
                                 break;
                         }
                     }
                 });
-            }
-            else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+
+                // Monitor level changes
+                hls.on(Hls.Events.LEVEL_SWITCHED, function (event, data) {
+                    var level = hls.levels[data.level];
+                    if (level) {
+                        logError('Quality: ' + (level.height || '?') + 'p');
+                    }
+                });
+
+            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                // Native HLS support (Safari, iOS)
                 video.src = finalUrl;
                 video.addEventListener('loadedmetadata', function () {
-                    video.play();
+                    video.play().catch(e => {
+                        logError("Tap Play to start");
+                    });
                     statusText.innerText = "LIVE (Native)";
+                    updateConnectionQuality('good');
                 });
+            } else {
+                statusText.innerText = "Browser not supported";
+                logError("HLS not supported in this browser");
             }
         }
 
@@ -279,12 +358,14 @@
             if (newUrl) {
                 videoSrc = newUrl;
                 localStorage.setItem('savedVideoSrc', newUrl);
+                retryCount = 0; // Reset retry count
                 loadStream(videoSrc);
             }
         }
 
         proxyToggle.addEventListener('change', function () {
             localStorage.setItem('useProxy', this.checked);
+            retryCount = 0; // Reset retry count
             loadStream(videoSrc);
         });
 
@@ -295,11 +376,34 @@
             if (hls) {
                 if (this.value == -1) {
                     hls.currentLevel = -1; // Auto
+                    logError('Quality set to Auto');
                 } else {
                     hls.currentLevel = parseInt(this.value);
+                    var level = hls.levels[this.value];
+                    logError('Quality set to ' + (level.height || '?') + 'p');
                 }
             }
         });
+
+        // Mobile-specific: Prevent screen sleep during playback
+        if ('wakeLock' in navigator) {
+            var wakeLock = null;
+
+            video.addEventListener('play', async function () {
+                try {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                } catch (err) {
+                    // Wake lock not available
+                }
+            });
+
+            video.addEventListener('pause', function () {
+                if (wakeLock) {
+                    wakeLock.release();
+                    wakeLock = null;
+                }
+            });
+        }
     </script>
 </body>
 
