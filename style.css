@@ -111,60 +111,51 @@ header p {
     width: 100%;
     height: 100%;
     object-fit: contain;
-    /* Ensures the video ratio is preserved without stretching */
     background: #000;
     border: none;
 }
 
-/* Custom Video Controls */
-/* Hide native controls if we strictly use custom ones,
-   but for mobile compatibility sometimes keeping native is safer.
-   We will try to overlay custom controls. */
-
-.custom-controls-bar {
+/* Connection Quality Indicator */
+.connection-indicator {
     position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    background: linear-gradient(to top, rgba(0, 0, 0, 0.9), transparent);
-    padding: 10px 15px;
+    top: 15px;
+    left: 15px;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    padding: 8px 15px;
+    border-radius: 20px;
     display: flex;
     align-items: center;
-    gap: 15px;
-    opacity: 0;
-    transition: opacity 0.3s;
-    border-bottom-left-radius: 20px;
-    border-bottom-right-radius: 20px;
+    gap: 8px;
+    z-index: 10;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    font-size: 0.85rem;
+    color: #fff;
+    transition: all 0.3s;
 }
 
-.video-wrapper:hover .custom-controls-bar {
-    opacity: 1;
-}
-
-.ctrl-btn {
-    background: none;
-    border: none;
-    color: white;
-    cursor: pointer;
+#connection-status {
     font-size: 1.2rem;
-    transition: transform 0.2s, color 0.2s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    transition: color 0.3s;
 }
 
-.ctrl-btn:hover {
-    color: var(--accent-color);
-    transform: scale(1.1);
+#connection-text {
+    font-weight: 500;
 }
 
-.volume-slider {
-    width: 80px;
-    cursor: pointer;
+/* Native Video Controls Styling */
+video::-webkit-media-controls-panel {
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.9), transparent);
 }
 
-.spacer {
-    flex-grow: 1;
+video::-webkit-media-controls-play-button,
+video::-webkit-media-controls-volume-slider,
+video::-webkit-media-controls-mute-button,
+video::-webkit-media-controls-timeline,
+video::-webkit-media-controls-current-time-display,
+video::-webkit-media-controls-time-remaining-display,
+video::-webkit-media-controls-fullscreen-button {
+    filter: brightness(1.2);
 }
 
 /* Message Box Styling - Glassy & Compact */
@@ -340,127 +331,31 @@ footer {
     }
 }
 
-/* Custom Video Controls */
-.video-wrapper {
-    position: relative;
-    overflow: hidden;
-    /* Ensure controls don't spill out */
-    border-radius: 16px;
-    /* Premium rounded look */
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-    /* Deep shadow */
-}
-
-/* Hide native controls effectively */
-video::-webkit-media-controls {
-    display: none !important;
-}
-
-.custom-controls-bar {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    height: 60px;
-    background: linear-gradient(to top, rgba(0, 0, 0, 0.9), transparent);
-    backdrop-filter: blur(8px);
-    /* stronger blur */
-    padding: 0 15px;
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    opacity: 0;
-    /* Hidden by default */
-    transition: opacity 0.3s ease-in-out;
-    z-index: 20;
-    pointer-events: none;
-    /* Let clicks pass through when hidden */
-}
-
-/* Show controls on hover or when paused */
-.video-wrapper:hover .custom-controls-bar,
-.custom-controls-bar.visible {
-    opacity: 1;
-    pointer-events: auto;
-}
-
-.ctrl-btn {
-    background: none;
-    border: none;
-    color: white;
-    cursor: pointer;
-    font-size: 1.5rem;
-    /* Larger icons */
-    width: 44px;
-    height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: transform 0.2s, color 0.2s;
-    user-select: none;
-    -webkit-tap-highlight-color: transparent;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-}
-
-.ctrl-btn:hover {
-    color: var(--accent-color);
-    transform: scale(1.1);
-}
-
-.ctrl-btn:active {
-    transform: scale(0.95);
-}
-
-.volume-slider {
-    width: 80px;
-    height: 4px;
-    -webkit-appearance: none;
-    appearance: none;
-    background: rgba(255, 255, 255, 0.3);
-    border-radius: 2px;
-    outline: none;
-    cursor: pointer;
-}
-
-.volume-slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 14px;
-    height: 14px;
-    background: #fff;
-    border-radius: 50%;
-    cursor: pointer;
-    transition: background 0.2s;
-    box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
-}
-
-.volume-slider::-webkit-slider-thumb:hover {
-    background: var(--accent-color);
-    transform: scale(1.2);
-}
-
-.spacer {
-    flex-grow: 1;
-}
-
-/* Hide volume slider on mobile to save space */
+/* Mobile Video Optimizations */
 @media (max-width: 600px) {
-    .ctrl-btn {
-        font-size: 1.3rem;
-        padding: 5px;
-        width: 36px;
-        height: 36px;
+    .connection-indicator {
+        font-size: 0.75rem;
+        padding: 6px 12px;
+        top: 10px;
+        left: 10px;
     }
 
-    #mute-btn {
-        display: flex;
-        /* Ensure mute btn stays visible */
+    #connection-status {
+        font-size: 1rem;
     }
 
-    .custom-controls-bar {
-        height: 50px;
-        padding: 0 5px;
-        gap: 8px;
-        /* Tighter gap on mobile */
+    .quality-control {
+        top: 10px;
+        right: 10px;
+        padding: 4px 10px;
+    }
+
+    .quality-control label {
+        font-size: 0.65rem;
+    }
+
+    .quality-control select {
+        font-size: 0.8rem;
     }
 }
 
