@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer">
+    <title>Family Group eke ayata Cricket</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <style>
+        #debug-log {
+            width: 100%;
+            max-width: 600px;
+            margin-top: 10px;
+            padding: 10px;
+            background: #222;
+            color: #ccc;
+            font-family: monospace;
+            font-size: 0.7rem;
+            border-radius: 8px;
+            display: none;
+            word-break: break-all;
+            text-align: left;
+        }
+
+        .admin-controls {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            width: 100%;
+            max-width: 600px;
+            text-align: center;
+        }
+
+        .url-input {
+            width: 70%;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #444;
+            background: #111;
+            color: #fff;
+            margin-right: 5px;
+        }
+
+        .btn-update {
+            padding: 8px 15px;
+            background: #ff4757;
+            border: none;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>Family Group eke ayata Cricket</h1>
+            <p>Live Stream Experience</p>
+        </header>
+
+        <main class="player-container">
+            <div class="video-wrapper" id="video-container">
+                <!-- Native controls removed for custom UI -->
+                <video id="video" autoplay playsinline muted></video>
+
+                <!-- Custom Controls -->
+                <div class="custom-controls-bar" id="custom-controls">
+                    <button class="ctrl-btn" onclick="video.paused ? video.play() : video.pause()" title="Play/Pause">
+                        <span id="play-icon">▶</span>
+                    </button>
+
+                    <button class="ctrl-btn" onclick="video.currentTime -= 5" title="Rewind 5s">↺ 5s</button>
+                    <button class="ctrl-btn" onclick="video.currentTime += 5" title="Forward 5s">↻ 5s</button>
+
+                    <button class="ctrl-btn" id="mute-btn" onclick="toggleMute()" title="Mute/Unmute">🔊</button>
+                    <input type="range" class="volume-slider" min="0" max="1" step="0.1" value="1" id="volume-range"
+                        oninput="video.volume=this.value; video.muted=false; updateMuteIcon();">
+
+                    <div class="spacer"></div>
+
+                    <div class="quality-control"
+                        style="position: relative; top: auto; right: auto; background: none; border: none; padding: 0;">
+                        <select id="quality-select"
+                            style="background: rgba(0,0,0,0.5); padding: 5px; border-radius: 5px;">
+                            <option value="-1">Auto</option>
+                        </select>
+                    </div>
+
+                    <button class="ctrl-btn" onclick="toggleFullScreen()" title="Fullscreen">⛶</button>
+                </div>
+            </div>
+
+            <div class="message-box">
+                <p>රංජිත් රත්නසිරිගේ අපල දුරු වේවා..!!</p>
+            </div>
+            <p class="stream-instruction">(If Stream stops, Enable Unblocker or Update Link)</p>
+
+            <div class="controls">
+                <p id="status" class="status-message">Loading Stream...</p>
+
+                <!-- New Unblocker Toggle -->
+                <div class="unblocker-control"
+                    style="margin: 15px 0; display: flex; align-items: center; justify-content: center; gap: 10px;">
+                    <label class="switch">
+                        <input type="checkbox" id="proxy-toggle">
+                        <span class="slider round"></span>
+                    </label>
+                    <span style="color: #ffcccc; font-weight: bold;">Enable Mobile Unblocker</span>
+                </div>
+
+                <div class="vpn-suggestion" style="margin-top: 10px;">
+                    <a href="https://1.1.1.1/" target="_blank" class="btn-vpn"
+                        style="text-decoration: none; color: #aaa; font-size: 0.8rem; border-bottom: 1px dotted #aaa;">
+                        Still blocked? Get 1.1.1.1 App
+                    </a>
+                </div>
+
+                <div id="debug-log"></div>
+            </div>
+
+            <!-- Admin Toggle Button -->
+            <button class="admin-toggle-btn"
+                onclick="document.getElementById('admin-panel').style.display = document.getElementById('admin-panel').style.display === 'none' ? 'block' : 'none'">
+                Update Stream Link (Admin)
+            </button>
+
+            <!-- Admin Area (Hidden by default) -->
+            <div id="admin-panel" class="admin-controls" style="display: none;">
+                <p style="color: #888; margin-bottom: 10px; font-size: 0.9rem;">Change Stream Link:</p>
+                <input type="text" id="stream-url" class="url-input" placeholder="Paste .m3u8 link here...">
+                <button onclick="updateStream()" class="btn-update">Play</button>
+            </div>
+        </main>
+
+        <footer>
+            <p>&copy; 2026 Live Stream. Premium Experience.</p>
+        </footer>
+    </div>
+
+    <script>
+        var video = document.getElementById('video');
+        var qualitySelect = document.getElementById('quality-select');
+        var statusText = document.getElementById('status');
+        var debugLog = document.getElementById('debug-log');
+        var proxyToggle = document.getElementById('proxy-toggle');
+        var urlInput = document.getElementById('stream-url');
+        var playIcon = document.getElementById('play-icon');
+
+        // Default Link
+        var defaultUrl = 'https://mut001.myluck1.top:8088/live/webcricn04/playlist.m3u8?vidictid=204966096525&id=114607&pk=3ef738dd90c7c0b44c4ca785f01c42dd3e4ea28aabe1fd655dcc0306b3bd32f87d2052fbb9f7afe9054dcc7a5485c9edb693e01479cd2799bc0f6cfa25f063bd';
+
+        var videoSrc = localStorage.getItem('savedVideoSrc') || defaultUrl;
+        urlInput.value = videoSrc;
+
+        var useProxy = localStorage.getItem('useProxy') === 'true';
+        proxyToggle.checked = useProxy;
+
+        var hls;
+
+        function logError(msg) {
+            debugLog.style.display = 'block';
+            debugLog.innerText += "\n> " + msg;
+        }
+
+        // Fullscreen Logic
+        function toggleFullScreen() {
+            var container = document.getElementById('video-container');
+            if (!document.fullscreenElement) {
+                if (container.requestFullscreen) container.requestFullscreen();
+                else if (video.webkitEnterFullscreen) video.webkitEnterFullscreen(); // iOS Safari fallback
+            } else {
+                if (document.exitFullscreen) document.exitFullscreen();
+            }
+        }
+
+        // Update Play Icon
+        video.onplay = function () { playIcon.innerText = "⏸"; };
+        video.onpause = function () { playIcon.innerText = "▶"; };
+
+        function updateMuteIcon() {
+            var muteBtn = document.getElementById('mute-btn');
+            if (video.muted || video.volume === 0) {
+                muteBtn.innerText = "🔇";
+            } else {
+                muteBtn.innerText = "🔊";
+            }
+        }
+
+        function toggleMute() {
+            video.muted = !video.muted;
+            if (!video.muted && video.volume === 0) video.volume = 1;
+            updateMuteIcon();
+        }
+
+        video.onvolumechange = updateMuteIcon;
+
+        function loadStream(url) {
+            if (hls) {
+                hls.destroy();
+            }
+
+            var finalUrl = url;
+            if (proxyToggle.checked) {
+                statusText.innerText = "Connecting via Unblocker...";
+                finalUrl = 'https://corsproxy.io/?' + encodeURIComponent(url);
+            } else {
+                statusText.innerText = "Connecting Direct...";
+            }
+
+            logError("Loading...");
+
+            if (Hls.isSupported()) {
+                var config = {
+                    startLevel: -1,             // AUTO Quality (Starts low, upgrades if good)
+                    autoLevelEnabled: true,     // Enable Auto-Switching
+                    maxBufferLength: 30,
+                    maxMaxBufferLength: 60,
+                    liveSyncDurationCount: 3,
+                };
+
+                hls = new Hls(config);
+                hls.loadSource(finalUrl);
+                hls.attachMedia(video);
+
+                hls.on(Hls.Events.MANIFEST_PARSED, function () {
+                    video.play().catch(e => logError("Tap Play"));
+                    statusText.innerText = proxyToggle.checked ? "LIVE (Unblocked)" : "LIVE (Direct)";
+                    logError("Connected!");
+
+                    // Populate Quality
+                    qualitySelect.innerHTML = '';
+                    hls.levels.forEach(function (level, index) {
+                        var option = document.createElement('option');
+                        option.value = index;
+                        option.text = (level.height || "Auto") + (index === hls.levels.length - 1 ? " (HD)" : "");
+                        qualitySelect.appendChild(option);
+                    });
+                    // Add Auto option
+                    var autoOpt = document.createElement('option');
+                    autoOpt.value = -1;
+                    autoOpt.text = "Auto (Best)";
+                    autoOpt.selected = true;
+                    qualitySelect.insertBefore(autoOpt, qualitySelect.firstChild);
+                });
+
+                hls.on(Hls.Events.ERROR, function (event, data) {
+                    if (data.fatal) {
+                        logError("Error: " + data.type);
+                        switch (data.type) {
+                            case Hls.ErrorTypes.NETWORK_ERROR:
+                                hls.startLoad();
+                                break;
+                            case Hls.ErrorTypes.MEDIA_ERROR:
+                                hls.recoverMediaError();
+                                break;
+                            default:
+                                hls.destroy();
+                                break;
+                        }
+                    }
+                });
+            }
+            else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                video.src = finalUrl;
+                video.addEventListener('loadedmetadata', function () {
+                    video.play();
+                    statusText.innerText = "LIVE (Native)";
+                });
+            }
+        }
+
+        function updateStream() {
+            var newUrl = urlInput.value.trim();
+            if (newUrl) {
+                videoSrc = newUrl;
+                localStorage.setItem('savedVideoSrc', newUrl);
+                loadStream(videoSrc);
+            }
+        }
+
+        proxyToggle.addEventListener('change', function () {
+            localStorage.setItem('useProxy', this.checked);
+            loadStream(videoSrc);
+        });
+
+        // Init
+        loadStream(videoSrc);
+
+        qualitySelect.addEventListener('change', function () {
+            if (hls) {
+                if (this.value == -1) {
+                    hls.currentLevel = -1; // Auto
+                } else {
+                    hls.currentLevel = parseInt(this.value);
+                }
+            }
+        });
+    </script>
+</body>
+
+</html>
